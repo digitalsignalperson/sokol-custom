@@ -1609,6 +1609,11 @@ typedef struct sapp_allocator {
     _SAPP_LOGITEM_XMACRO(LINUX_X11_OPEN_DISPLAY_FAILED, "XOpenDisplay() failed") \
     _SAPP_LOGITEM_XMACRO(LINUX_X11_QUERY_SYSTEM_DPI_FAILED, "failed to query system dpi value, assuming default 96.0") \
     _SAPP_LOGITEM_XMACRO(LINUX_X11_DROPPED_FILE_URI_WRONG_SCHEME, "dropped file URL doesn't start with 'file://'") \
+    _SAPP_LOGITEM_XMACRO(LINUX_WAYLAND_UPDATE_CURSOR_FAILED, "unable to load/display cursor") \
+    _SAPP_LOGITEM_XMACRO(LINUX_WAYLAND_CLIPBOARD_SEND_FAILED, "write() failed, unable to send clipboard data") \
+    _SAPP_LOGITEM_XMACRO(LINUX_WAYLAND_CLIPBOARD_MIME_FAILED, "Unable to handle clipboard mime type") \
+    _SAPP_LOGITEM_XMACRO(LINUX_WAYLAND_KEYMAP_READ_FAIL, "wayland: unable to read keymap via mmap()") \
+    _SAPP_LOGITEM_XMACRO(LINUX_WAYLAND_KEYMAP_NO_KEYMAP, "no keymap retrieved from compositor") \
     _SAPP_LOGITEM_XMACRO(ANDROID_UNSUPPORTED_INPUT_EVENT_INPUT_CB, "unsupported input event encountered in _sapp_android_input_cb()") \
     _SAPP_LOGITEM_XMACRO(ANDROID_UNSUPPORTED_INPUT_EVENT_MAIN_CB, "unsupported input event encountered in _sapp_android_main_cb()") \
     _SAPP_LOGITEM_XMACRO(ANDROID_READ_MSG_FAILED, "failed to read message in _sapp_android_main_cb()") \
@@ -3456,6 +3461,8 @@ static const char* _sapp_log_messages[] = {
 };
 #undef _SAPP_LOGITEM_XMACRO
 #endif // SOKOL_DEBUG
+
+#define _sapp_fail(line) _sapp.desc.logger.func("sapp", 1, 0, line, __LINE__, __FILE__, _sapp.desc.logger.user_data); // TODO replace these
 
 #define _SAPP_PANIC(code) _sapp_log(SAPP_LOGITEM_ ##code, 0, 0, __LINE__)
 #define _SAPP_ERROR(code) _sapp_log(SAPP_LOGITEM_ ##code, 1, 0, __LINE__)
@@ -9293,7 +9300,7 @@ _SOKOL_PRIVATE bool _sapp_linux_parse_dropped_files_list(const char* src) {
                 ((src_count == 6) && (src_chr != '/')) ||
                 ((src_count == 7) && (src_chr != '/')))
             {
-                SAPP_LOG("sokol_app.h: dropped file URI doesn't start with file://");
+                _SAPP_ERROR(LINUX_X11_DROPPED_FILE_URI_WRONG_SCHEME);
                 err = true;
                 break;
             }
@@ -9326,7 +9333,7 @@ _SOKOL_PRIVATE bool _sapp_linux_parse_dropped_files_list(const char* src) {
                 *dst_ptr++ = dst_chr;
             }
             else {
-                SAPP_LOG("sokol_app.h: dropped file path too long (sapp_desc.max_dropped_file_path_length)");
+                _SAPP_ERROR(DROPPED_FILE_PATH_TOO_LONG);
                 err = true;
                 break;
             }
@@ -11973,12 +11980,7 @@ _SOKOL_PRIVATE void _sapp_wl_update_cursor(sapp_mouse_cursor cursor, uint32_t se
 
     struct wl_cursor *selected_cursor = _sapp.wl.cursors[cursor].cursor;
     if (NULL == selected_cursor) {
-        const char* fmt = "Warning: Unable to load/display cursor with id: '%d'!";
-        const size_t len = strlen(fmt) + 4;
-        char* msg = (char *) _sapp_malloc(len * sizeof(char));
-        snprintf(msg, len, fmt, cursor);
-        SOKOL_LOG(msg);
-        _sapp_free(msg);
+        _SAPP_ERROR(LINUX_WAYLAND_UPDATE_CURSOR_FAILED);  // TODO include (int)cursor in error message
         return;
     }
 
@@ -12193,15 +12195,10 @@ _SOKOL_PRIVATE void _sapp_wl_data_source_handle_send(void* data, struct wl_data_
 
     if (0 == strcmp(mime_type, "text/plain")) {
         if (write(fd, _sapp.clipboard.buffer, strlen(_sapp.clipboard.buffer)) < 0) {
-            _sapp_fail("wayland: write() failed, unable to send clipboard data");
+            _SAPP_ERROR(LINUX_WAYLAND_CLIPBOARD_SEND_FAILED);
         }
     } else {
-        const char* fmt = "Unable to handle clipboard mime type: '%s'!";
-        const size_t len = strlen(fmt) + 32;
-        char* msg = (char *) _sapp_malloc(len * sizeof(char));
-        snprintf(msg, len, fmt, mime_type);
-        SOKOL_LOG(msg);
-        _sapp_free(msg);
+        _SAPP_ERROR(LINUX_WAYLAND_CLIPBOARD_MIME_FAILED); // TODO include mime_type in message
     }
 
     close(fd);
@@ -12315,12 +12312,12 @@ _SOKOL_PRIVATE void _sapp_wl_keyboard_keymap(void* data, struct wl_keyboard* key
 
     char* keymap_shm = (char *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (MAP_FAILED == keymap_shm) {
-        _sapp_fail("wayland: unable to read keymap via mmap()");
+        _SAPP_ERROR(LINUX_WAYLAND_KEYMAP_READ_FAIL);
     }
 
     switch (format) {
         case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP:
-            SOKOL_LOG("no keymap retrieved from compositor\n");
+            _SAPP_ERROR(LINUX_WAYLAND_KEYMAP_NO_KEYMAP);
             break;
         case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1:
             xkb_keymap_unref(_sapp.wl.xkb_keymap);
