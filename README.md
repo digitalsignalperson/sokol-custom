@@ -6,7 +6,7 @@
 
 # This fork
 
-This fork is based off https://github.com/floooh/sokol/pull/425 to add Wayland support to `sokol_app.h`.
+This fork is based off [@fleischie](https://github.com/fleischie)'s [PR #425](https://github.com/floooh/sokol/pull/425) to add Wayland support to `sokol_app.h`. See also [this branch](https://github.com/digitalsignalperson/sokol-custom/tree/wayland-pr-rebase) that rebased the PR before moving everything around.
 
 Since this PR [might not be merged anytime soon](https://github.com/floooh/sokol/pull/425#issuecomment-1576533124), this fork makes the Wayland implementation very easy to rebase against upstream.
 

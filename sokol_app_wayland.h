@@ -3,6 +3,8 @@
 #define SOKOL_LINUX_CUSTOM
 #include "sokol_app.h"
 
+// Note: This Wayland implementation is based off [@fleischie](https://github.com/fleischie)'s [PR #425](https://github.com/floooh/sokol/pull/425)
+
 #define _sapp_wl_toggle_fullscreen _sapp_linux_toggle_fullscreen
 #define _sapp_wl_update_cursor _sapp_linux_update_cursor
 #define _sapp_wl_lock_mouse _sapp_linux_lock_mouse
