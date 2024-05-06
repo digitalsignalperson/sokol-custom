@@ -3136,6 +3136,7 @@ typedef struct {
     struct wl_data_device* data_device;
     struct wl_data_device_manager* data_device_manager;
     struct wl_display* display;
+    struct wl_display* wrapped_display;
     struct wl_egl_window* egl_window;
     struct wl_event_queue* event_queue;
     struct wl_keyboard* keyboard;
@@ -11946,6 +11947,7 @@ _SOKOL_PRIVATE void _sapp_wl_cleanup(void) {
     }
     _sapp.wl.max_outputs = 0;
 
+    if (NULL != _sapp.wl.wrapped_display) wl_proxy_wrapper_destroy(_sapp.wl.wrapped_display);
     if (NULL != _sapp.wl.toplevel) xdg_toplevel_destroy(_sapp.wl.toplevel);
     if (NULL != _sapp.wl.shell) xdg_surface_destroy(_sapp.wl.shell);
     if (NULL != _sapp.wl.wm_base) xdg_wm_base_destroy(_sapp.wl.wm_base);
@@ -12601,9 +12603,11 @@ _SOKOL_PRIVATE void _sapp_wl_create_cursor(sapp_mouse_cursor cursor, struct wl_c
     SOKOL_ASSERT((cursor >= 0) && (cursor < _SAPP_MOUSECURSOR_NUM));
 
     struct wl_cursor *curr_cursor = wl_cursor_theme_get_cursor(theme, name);
-    _sapp.wl.cursors[cursor].cursor = curr_cursor;
-    struct wl_buffer *curr_buffer = wl_cursor_image_get_buffer(curr_cursor->images[0]);
-    _sapp.wl.cursors[cursor].buffer = curr_buffer;
+    if (NULL != curr_cursor) {
+        _sapp.wl.cursors[cursor].cursor = curr_cursor;
+        struct wl_buffer *curr_buffer = wl_cursor_image_get_buffer(curr_cursor->images[0]);
+        _sapp.wl.cursors[cursor].buffer = curr_buffer;
+    }
 }
 
 _SOKOL_PRIVATE void _sapp_wl_seat_handle_capabilities(void* data, struct wl_seat* seat, uint32_t capabilities) {
@@ -13009,13 +13013,15 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
         _sapp_fail("wayland: wl_display_connect() failed");
     }
 
+    _sapp.wl.wrapped_display = wl_proxy_create_wrapper(_sapp.wl.display);
+
     _sapp.wl.event_queue = wl_display_create_queue(_sapp.wl.display);
-    wl_proxy_set_queue((struct wl_proxy *) _sapp.wl.display, _sapp.wl.event_queue);
+    wl_proxy_set_queue((struct wl_proxy *) _sapp.wl.wrapped_display, _sapp.wl.event_queue);
     if (NULL == _sapp.wl.event_queue) {
         _sapp_fail("wayland: wl_proxy_set_queue() failed");
     }
 
-    _sapp.wl.registry = wl_display_get_registry(_sapp.wl.display);
+    _sapp.wl.registry = wl_display_get_registry(_sapp.wl.wrapped_display);
 
     wl_registry_add_listener(_sapp.wl.registry, &_sapp_wl_registry_listener, NULL);
     wl_display_roundtrip_queue(_sapp.wl.display, _sapp.wl.event_queue);
