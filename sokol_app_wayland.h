@@ -410,14 +410,12 @@ _SOKOL_PRIVATE void _sapp_wl_cleanup(void) {
     }
     _sapp_wl.max_outputs = 0;
 
-    if (NULL != _sapp_wl.wrapped_display) wl_proxy_wrapper_destroy(_sapp_wl.wrapped_display);
     if (NULL != _sapp_wl.toplevel) xdg_toplevel_destroy(_sapp_wl.toplevel);
     if (NULL != _sapp_wl.shell) xdg_surface_destroy(_sapp_wl.shell);
     if (NULL != _sapp_wl.wm_base) xdg_wm_base_destroy(_sapp_wl.wm_base);
     if (NULL != _sapp_wl.surface) wl_surface_destroy(_sapp_wl.surface);
     if (NULL != _sapp_wl.compositor) wl_compositor_destroy(_sapp_wl.compositor);
     if (NULL != _sapp_wl.registry) wl_registry_destroy(_sapp_wl.registry);
-    if (NULL != _sapp_wl.event_queue) wl_event_queue_destroy(_sapp_wl.event_queue);
     if (NULL != _sapp_wl.data_device) wl_data_device_release(_sapp_wl.data_device);
     if (NULL != _sapp_wl.data_device_manager) wl_data_device_manager_destroy(_sapp_wl.data_device_manager);
     if (NULL != _sapp_wl.touch) wl_touch_destroy(_sapp_wl.touch);
@@ -434,6 +432,26 @@ _SOKOL_PRIVATE void _sapp_wl_cleanup(void) {
     if (NULL != _sapp_wl.xkb_keymap) xkb_keymap_unref(_sapp_wl.xkb_keymap);
     if (NULL != _sapp_wl.xkb_state) xkb_state_unref(_sapp_wl.xkb_state);
     if (NULL != _sapp_wl.xkb_context) xkb_context_unref(_sapp_wl.xkb_context);
+
+    if (NULL != _sapp_wl.wrapped_display) wl_proxy_wrapper_destroy(_sapp_wl.wrapped_display);
+
+    for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
+        struct wl_buffer* buffer = _sapp_wl.cursors[i].buffer;
+        if (NULL != buffer)
+            wl_buffer_destroy(buffer);
+    }
+
+    if (NULL != _sapp_wl.data_offer) {
+        wl_data_offer_destroy(_sapp_wl.data_offer);
+        // TODO this doesn't seem to be the wl_data_offer that is still attached
+        // when destroying the queue it complains that e.g. 
+        //     warning: queue 0x62f6d5be5b40 destroyed while proxies still attached:
+        //       wl_data_offer@4278190080 still attached
+        //       wl_shm_pool@26 still attached
+    }
+    // TODO where is the wl_shm_pool to be destroyed?
+    
+    if (NULL != _sapp_wl.event_queue) wl_event_queue_destroy(_sapp_wl.event_queue);
 
     epoll_ctl(_sapp_wl.epoll_fd, EPOLL_CTL_DEL, _sapp_wl.event_fd, NULL);
     close(_sapp_wl.event_fd);
