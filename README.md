@@ -4,6 +4,44 @@
     cross-platform libraries for C and C++, written in C.<br/><br/>
 </p>
 
+# This fork
+
+This fork is based off https://github.com/floooh/sokol/pull/425 to add Wayland support to `sokol_app.h`.
+
+Since this PR [might not be merged anytime soon](https://github.com/floooh/sokol/pull/425#issuecomment-1576533124), this fork makes the Wayland implementation very easy to rebase against upstream.
+
+Changes to `sokol_app.h` have been minimized so if `SOKOL_LINUX_CUSTOM` is defined, then the X11 backend will be excluded, and the following functions can be defined externally:
+- `_SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc);`
+- `_SOKOL_PRIVATE void _sapp_linux_toggle_fullscreen(void);`
+- `_SOKOL_PRIVATE void _sapp_linux_update_cursor(sapp_mouse_cursor cursor, bool shown);`
+- `_SOKOL_PRIVATE void _sapp_linux_lock_mouse(bool lock);`
+- `_SOKOL_PRIVATE void _sapp_linux_update_window_title(void);`
+- `_SOKOL_PRIVATE void _sapp_linux_set_icon(const sapp_icon_desc* icon_desc, int num_images);`
+- `_SOKOL_PRIVATE void _sapp_linux_set_clipboard_string(const char* str);`
+- `_SOKOL_PRIVATE const char* _sapp_linux_get_clipboard_string(void);`
+
+The wayland implementation has been moved to `sokol_app_wayland.h`. You should `#include "sokol_app.h"` normally except for where you `#define SOKOL_IMPL`.
+For example, in [sokol-samples](https://github.com/floooh/sokol-samples) in `libs/sokol/sokol.c`:
+
+```diff
+--- a/libs/sokol/sokol.c
++++ b/libs/sokol/sokol.c
+@@ -2,7 +2,7 @@
+ /* this is only needed for the debug-inspection headers */
+ #define SOKOL_TRACE_HOOKS
+ /* sokol 3D-API defines are provided by build options */
+-#include "sokol_app.h"
++#include "sokol_app_wayland.h"
+ #include "sokol_gfx.h"
+ #include "sokol_time.h"
+ #include "sokol_audio.h"
+```
+
+I'm not sure if this is the best pattern, but it is one way that lets our custom header access and extend the private implementation.
+
+This patch to `sokol_app.h` could also be used to add implementations for SDL or GLFW.
+
+
 # Sokol
 
 [**See what's new**](https://github.com/floooh/sokol/blob/master/CHANGELOG.md) (**29-Feb-2024**: **BREAKING CHANGES** 'unified render pass'
