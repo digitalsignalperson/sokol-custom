@@ -118,7 +118,6 @@ typedef struct {
     struct wl_data_device* data_device;
     struct wl_data_device_manager* data_device_manager;
     struct wl_display* display;
-    struct wl_display* wrapped_display;
     struct wl_egl_window* egl_window;
     struct wl_event_queue* event_queue;
     struct wl_keyboard* keyboard;
@@ -432,8 +431,6 @@ _SOKOL_PRIVATE void _sapp_wl_cleanup(void) {
     if (NULL != _sapp_wl.xkb_keymap) xkb_keymap_unref(_sapp_wl.xkb_keymap);
     if (NULL != _sapp_wl.xkb_state) xkb_state_unref(_sapp_wl.xkb_state);
     if (NULL != _sapp_wl.xkb_context) xkb_context_unref(_sapp_wl.xkb_context);
-
-    if (NULL != _sapp_wl.wrapped_display) wl_proxy_wrapper_destroy(_sapp_wl.wrapped_display);
 
     for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
         struct wl_buffer* buffer = _sapp_wl.cursors[i].buffer;
@@ -1508,18 +1505,19 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
         _sapp_fail("wayland: wl_display_connect() failed");
     }
 
-    _sapp_wl.wrapped_display = (struct wl_display*)wl_proxy_create_wrapper(_sapp_wl.display);
+    struct wl_display* wrapped_display = (struct wl_display*)wl_proxy_create_wrapper(_sapp_wl.display);
 
     _sapp_wl.event_queue = wl_display_create_queue(_sapp_wl.display);
-    wl_proxy_set_queue((struct wl_proxy *) _sapp_wl.wrapped_display, _sapp_wl.event_queue);
+    wl_proxy_set_queue((struct wl_proxy *) wrapped_display, _sapp_wl.event_queue);
     if (NULL == _sapp_wl.event_queue) {
         _sapp_fail("wayland: wl_proxy_set_queue() failed");
     }
 
-    _sapp_wl.registry = wl_display_get_registry(_sapp_wl.wrapped_display);
+    _sapp_wl.registry = wl_display_get_registry(wrapped_display);
 
     wl_registry_add_listener(_sapp_wl.registry, &_sapp_wl_registry_listener, NULL);
     wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
+    wl_proxy_wrapper_destroy(wrapped_display);
 
     if (NULL == _sapp_wl.compositor) {
         _sapp_fail("wayland: wl_register_add_listener() failed");
