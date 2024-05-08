@@ -1514,10 +1514,10 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
     }
 
     _sapp_wl.registry = wl_display_get_registry(wrapped_display);
+    wl_proxy_wrapper_destroy(wrapped_display);
 
     wl_registry_add_listener(_sapp_wl.registry, &_sapp_wl_registry_listener, NULL);
     wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
-    wl_proxy_wrapper_destroy(wrapped_display);
 
     if (NULL == _sapp_wl.compositor) {
         _sapp_fail("wayland: wl_register_add_listener() failed");
@@ -1547,7 +1547,7 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
 
     if (NULL != _sapp_wl.seat && NULL != _sapp_wl.data_device_manager) {
         _sapp_wl.data_device = wl_data_device_manager_get_data_device(_sapp_wl.data_device_manager, _sapp_wl.seat);
-        wl_data_device_add_listener(_sapp_wl.data_device, &_sapp_wl_data_device_listener, NULL);
+        // wl_data_device_add_listener(_sapp_wl.data_device, &_sapp_wl_data_device_listener, NULL);
     }
 }
 
@@ -1716,29 +1716,12 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
 
     _sapp.valid = true;
     while (!_sapp.quit_ordered) {
-        /* exhaust event queue */
-        while (0 > wl_display_prepare_read_queue(_sapp_wl.display, _sapp_wl.event_queue)) {
-            wl_display_dispatch_queue_pending(_sapp_wl.display, _sapp_wl.event_queue);
-        }
-        wl_display_flush(_sapp_wl.display);
-
-        int event_count = epoll_wait(_sapp_wl.epoll_fd, _sapp_wl.events, _SAPP_WAYLAND_MAX_EPOLL_EVENTS, -1);
-        for (int i = 0; i < event_count; i++) {
-            if (_sapp_wl.event_fd == _sapp_wl.events[i].data.fd) {
-                /* NOTE: check _sapp_wl_setup() for wl_proxy_set_queue()
-                 * call, that sets the custom event_queue as proxy for
-                 * default display, that's why the following call is not
-                 * explicitly stating the queue to read events for/from */
-                wl_display_read_events(_sapp_wl.display);
-            }
-        }
-
+        wl_display_dispatch_queue(_sapp_wl.display, _sapp_wl.event_queue);
         _sapp_frame();
         eglSwapBuffers(_sapp_wl.egl_display, _sapp_wl.egl_surface);
         wl_surface_damage_buffer(_sapp_wl.surface, 0, 0, INT32_MAX, INT32_MAX);
         wl_surface_commit(_sapp_wl.surface);
 
-        wl_display_dispatch_queue_pending(_sapp_wl.display, _sapp_wl.event_queue);
 
         /* emulate key repeats */
         if (_sapp_wl.repeat_key_code != SAPP_KEYCODE_INVALID) {
