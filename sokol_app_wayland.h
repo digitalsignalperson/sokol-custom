@@ -461,7 +461,7 @@ _SOKOL_PRIVATE void _sapp_wl_update_cursor(sapp_mouse_cursor cursor, bool shown)
 
     struct wl_cursor *selected_cursor = _sapp_wl.cursors[cursor].cursor;
     if (NULL == selected_cursor) {
-        _sapp_fail("unable to load/display cursor");
+        // don't show error messages or this will spam
         return;
     }
 
@@ -1453,7 +1453,7 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     _SOKOL_UNUSED(data_device);
     _SOKOL_UNUSED(offer);
 
-    if (!_sapp.clipboard.enabled || NULL == offer) {
+    if (!_sapp.clipboard.enabled || NULL == _sapp_wl.data_offer) {
         return;
     }
 
@@ -1461,21 +1461,24 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     if (pipe(fds) < 0) {
         _sapp_fail("wayland: pipe() failed to create communication channel for clipboard selection");
     }
-    wl_data_offer_receive(offer, "text/plain", fds[1]);
+    wl_data_offer_receive(_sapp_wl.data_offer, "text/plain", fds[1]);
     close(fds[1]);
 
     wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
 
     size_t buf_size = (size_t) _sapp.clipboard.buf_size;
-    ssize_t n = read(fds[0], _sapp.clipboard.buffer, buf_size);
-    _sapp.clipboard.buffer[n] = 0;
+    ssize_t n = read(fds[0], _sapp.clipboard.buffer, buf_size - 1);
+    if (n < 0) {
+        _sapp_fail("wayland: read() failed to receive clipboard offer");
+        _sapp.clipboard.buffer[0] = 0;
+    } else {
+        _sapp.clipboard.buffer[n] = 0;
+    }
     close(fds[0]);
 
-    wl_data_offer_destroy(offer);
-    if (NULL != _sapp_wl.data_offer) {
-        wl_data_offer_destroy(_sapp_wl.data_offer);
-        _sapp_wl.data_offer = NULL;
-    }
+    wl_data_offer_finish(_sapp_wl.data_offer);
+    wl_data_offer_destroy(_sapp_wl.data_offer);
+    _sapp_wl.data_offer = NULL;
 }
 
 _SOKOL_PRIVATE const struct wl_data_device_listener _sapp_wl_data_device_listener = {
@@ -1547,7 +1550,7 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
 
     if (NULL != _sapp_wl.seat && NULL != _sapp_wl.data_device_manager) {
         _sapp_wl.data_device = wl_data_device_manager_get_data_device(_sapp_wl.data_device_manager, _sapp_wl.seat);
-        // wl_data_device_add_listener(_sapp_wl.data_device, &_sapp_wl_data_device_listener, NULL);
+        wl_data_device_add_listener(_sapp_wl.data_device, &_sapp_wl_data_device_listener, NULL);
     }
 }
 
