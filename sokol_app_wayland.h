@@ -1476,6 +1476,7 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
 
     wl_data_offer_destroy(offer);
     if (NULL != _sapp_wl.data_offer) {
+        wl_data_offer_destroy(_sapp_wl.data_offer);
         _sapp_wl.data_offer = NULL;
     }
 }
