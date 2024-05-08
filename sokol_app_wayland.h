@@ -1508,7 +1508,7 @@ _SOKOL_PRIVATE void _sapp_wl_setup(const sapp_desc* desc) {
         _sapp_fail("wayland: wl_display_connect() failed");
     }
 
-    _sapp_wl.wrapped_display = wl_proxy_create_wrapper(_sapp_wl.display);
+    _sapp_wl.wrapped_display = (struct wl_display*)wl_proxy_create_wrapper(_sapp_wl.display);
 
     _sapp_wl.event_queue = wl_display_create_queue(_sapp_wl.display);
     wl_proxy_set_queue((struct wl_proxy *) _sapp_wl.wrapped_display, _sapp_wl.event_queue);
