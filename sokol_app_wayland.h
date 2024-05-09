@@ -613,10 +613,24 @@ _SOKOL_PRIVATE void _sapp_wl_mouse_event(sapp_event_type type, sapp_mousebutton 
 _SOKOL_PRIVATE void _sapp_wl_scroll_event(bool is_vertical_axis, double value, uint32_t modifiers) {
     if (_sapp_events_enabled()) {
         _sapp_init_event(SAPP_EVENTTYPE_MOUSE_SCROLL);
+
+        // value is in surface-local coordinates (divide by dpi to get pixel coords)
+        // but these aren't sensible values to pass to our scroll event handlers
+        float scroll = (float) value;
+        // Need to invert this, or else everything is backwards
+        scroll = -scroll;
+
         if (is_vertical_axis) {
-            _sapp.event.scroll_x = (float) value;
+            // My mouse: value is +/-15 per click scrolling 75 lines
+            // (per ImGui docs for MouseWheel: 1 unit = 5 lines of text)
+            // For 3 lines per click, multiply by 3/75 = 1/25
+            scroll /= 25.0f;
+            _sapp.event.scroll_y = scroll;
         } else {
-            _sapp.event.scroll_y = (float) value;
+            // My mouse: value is +/-7 per click scrolling 27 columns
+            // For ~5 columns per click, multiply by 5/27 ~= 1/5
+            scroll /= 5.0f;
+            _sapp.event.scroll_x = scroll;
         }
         _sapp.event.modifiers = modifiers;
         _sapp_call_event(&_sapp.event);
