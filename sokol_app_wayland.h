@@ -1733,6 +1733,7 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
 
     _sapp.valid = true;
     while (!_sapp.quit_ordered) {
+        _sapp_timing_measure(&_sapp.timing);
         wl_display_dispatch_queue(_sapp_wl.display, _sapp_wl.event_queue);
         _sapp_frame();
         eglSwapBuffers(_sapp_wl.egl_display, _sapp_wl.egl_surface);
