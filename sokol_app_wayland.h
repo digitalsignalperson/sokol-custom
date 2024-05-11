@@ -780,7 +780,11 @@ _SOKOL_PRIVATE void _sapp_wl_keyboard_key(void* data, struct wl_keyboard* keyboa
                 _sapp_wl.repeat_key_code = code;
             }
         } else if (WL_KEYBOARD_KEY_STATE_RELEASED == key_state) {
-            _sapp_wl_key_event(SAPP_EVENTTYPE_KEY_UP, code, false, modifiers);
+            _sapp_wl_key_event(SAPP_EVENTTYPE_KEY_UP, code, false, 0);
+            // Don't send modifiers for key release or else this happens:
+            // e.g. Press Ctrl and release: 
+            //  - ImGui inputs will show there is a Key down for "ModCtrl" 662 with a CTRL modifier,
+            //  - this stays on until another input occurs.
 
             if (_sapp_wl.repeat_key_code == code) {
                 _sapp_wl.repeat_key_char = 0;
