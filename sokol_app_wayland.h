@@ -13,7 +13,8 @@
 #define _sapp_wl_set_clipboard_string _sapp_linux_set_clipboard_string
 #define _sapp_wl_get_clipboard_string _sapp_linux_get_clipboard_string
 
-#define _sapp_fail(line) _sapp.desc.logger.func("sapp", 1, 0, line, __LINE__, __FILE__, _sapp.desc.logger.user_data); // TODO replace these
+#define _sapp_fail(line) _sapp.desc.logger.func("sapp", 1, 9999, line, __LINE__, __FILE__, _sapp.desc.logger.user_data); // TODO replace these
+#define _sapp_info(line) _sapp.desc.logger.func("sapp", 3, 9999, line, __LINE__, __FILE__, _sapp.desc.logger.user_data);
 
 #include <EGL/egl.h>
 #include <linux/input-event-codes.h>
@@ -1480,14 +1481,33 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
 
     wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
 
-    size_t buf_size = (size_t) _sapp.clipboard.buf_size;
-    ssize_t n = read(fds[0], _sapp.clipboard.buffer, buf_size - 1);
-    if (n < 0) {
-        _sapp_fail("wayland: read() failed to receive clipboard offer");
-        _sapp.clipboard.buffer[0] = 0;
-    } else {
-        _sapp.clipboard.buffer[n] = 0;
+    size_t max_read = (size_t) _sapp.clipboard.buf_size - 1;
+    size_t bytes_read = 0;
+    size_t total_bytes_read = 0;
+    while (total_bytes_read < max_read) {
+        // read() gives a max 65536 bytes at a time, regardless of buf_size
+        bytes_read = read(fds[0], _sapp.clipboard.buffer + total_bytes_read, max_read - total_bytes_read);
+        if (bytes_read > 0)
+            total_bytes_read += bytes_read;
+        else
+            break;
     }
+    _sapp.clipboard.buffer[total_bytes_read] = 0;
+
+    char buffer[128];
+    snprintf(buffer, 128, "Read %d bytes into clipboard buffer of size %d and %s", total_bytes_read, max_read,
+        bytes_read > 0 ? "ran out of clipboard space" : 
+        bytes_read == 0 ? "reached EOF" : "failed reading");
+    
+    if (bytes_read < 0) {
+        _sapp_fail(buffer);
+    } else {
+        _sapp_info(buffer); // Remove after below TODO
+    }
+    // TODO only accept & receive the offer when Ctrl+V is pressed
+    // otherwise every time the window gains focus it grabs a copy of the clipboard
+    // as shown by this log message
+
     close(fds[0]);
 
     wl_data_offer_finish(_sapp_wl.data_offer);
