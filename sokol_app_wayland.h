@@ -172,6 +172,7 @@ typedef struct {
 
     /* dnd data */
     struct wl_data_offer *data_offer;
+    int selection_available;
 
     /* surface reference for focus/unfocused event */
     struct wl_surface* focus;
@@ -570,6 +571,7 @@ _SOKOL_PRIVATE void _sapp_wl_resize_window(int width, int height) {
     }
 }
 
+_SOKOL_PRIVATE void _sapp_wl_accept_selection();
 _SOKOL_PRIVATE void _sapp_wl_key_event(sapp_event_type type, sapp_keycode key, bool is_repeat, uint32_t modifiers) {
     if (_sapp_events_enabled()) {
         _sapp_init_event(type);
@@ -584,6 +586,7 @@ _SOKOL_PRIVATE void _sapp_wl_key_event(sapp_event_type type, sapp_keycode key, b
             (_sapp.event.modifiers == SAPP_MODIFIER_CTRL) &&
             (_sapp.event.key_code == SAPP_KEYCODE_V))
         {
+            _sapp_wl_accept_selection();
             _sapp_init_event(SAPP_EVENTTYPE_CLIPBOARD_PASTED);
             _sapp_call_event(&_sapp.event);
         }
@@ -1396,6 +1399,7 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_data_offer(void* data, struct wl
 
     if (NULL != _sapp_wl.data_offer) {
         wl_data_offer_destroy(_sapp_wl.data_offer);
+        _sapp_wl.selection_available = 0;
     }
 
     _sapp_wl.data_offer = offer;
@@ -1472,7 +1476,11 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     _SOKOL_UNUSED(data_device);
     _SOKOL_UNUSED(offer);
 
-    if (!_sapp.clipboard.enabled || NULL == _sapp_wl.data_offer) {
+    _sapp_wl.selection_available = 1;
+}
+
+_SOKOL_PRIVATE void _sapp_wl_accept_selection() {
+    if (!_sapp.clipboard.enabled || NULL == _sapp_wl.data_offer || _sapp_wl.selection_available != 1) {
         return;
     }
 
@@ -1517,6 +1525,7 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     wl_data_offer_finish(_sapp_wl.data_offer);
     wl_data_offer_destroy(_sapp_wl.data_offer);
     _sapp_wl.data_offer = NULL;
+    _sapp_wl.selection_available = 0;
 }
 
 _SOKOL_PRIVATE const struct wl_data_device_listener _sapp_wl_data_device_listener = {
