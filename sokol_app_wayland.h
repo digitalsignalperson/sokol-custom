@@ -571,7 +571,52 @@ _SOKOL_PRIVATE void _sapp_wl_resize_window(int width, int height) {
     }
 }
 
-_SOKOL_PRIVATE void _sapp_wl_accept_selection();
+_SOKOL_PRIVATE void _sapp_wl_accept_selection() {
+    if (!_sapp.clipboard.enabled || NULL == _sapp_wl.data_offer || _sapp_wl.selection_available != 1) {
+        return;
+    }
+
+    int fds[2];
+    if (pipe(fds) < 0) {
+        _sapp_fail("wayland: pipe() failed to create communication channel for clipboard selection");
+    }
+    wl_data_offer_receive(_sapp_wl.data_offer, "text/plain", fds[1]);
+    close(fds[1]);
+
+    wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
+
+    size_t max_read = (size_t) _sapp.clipboard.buf_size - 1;
+    size_t bytes_read = 0;
+    size_t total_bytes_read = 0;
+    while (total_bytes_read < max_read) {
+        // read() gives a max 65536 bytes at a time, regardless of buf_size
+        bytes_read = read(fds[0], _sapp.clipboard.buffer + total_bytes_read, max_read - total_bytes_read);
+        if (bytes_read > 0)
+            total_bytes_read += bytes_read;
+        else
+            break;
+    }
+    _sapp.clipboard.buffer[total_bytes_read] = 0;
+
+    char buffer[128];
+    snprintf(buffer, 128, "Read %d bytes into clipboard buffer of size %d and %s", total_bytes_read, max_read,
+        bytes_read > 0 ? "ran out of clipboard space" : 
+        bytes_read == 0 ? "reached EOF" : "failed reading");
+    
+    if (bytes_read < 0) {
+        _sapp_fail(buffer);
+    } else {
+        _sapp_info(buffer);
+    }
+
+    close(fds[0]);
+
+    wl_data_offer_finish(_sapp_wl.data_offer);
+    wl_data_offer_destroy(_sapp_wl.data_offer);
+    _sapp_wl.data_offer = NULL;
+    _sapp_wl.selection_available = 0;
+}
+
 _SOKOL_PRIVATE void _sapp_wl_key_event(sapp_event_type type, sapp_keycode key, bool is_repeat, uint32_t modifiers) {
     if (_sapp_events_enabled()) {
         _sapp_init_event(type);
@@ -1477,55 +1522,6 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     _SOKOL_UNUSED(offer);
 
     _sapp_wl.selection_available = 1;
-}
-
-_SOKOL_PRIVATE void _sapp_wl_accept_selection() {
-    if (!_sapp.clipboard.enabled || NULL == _sapp_wl.data_offer || _sapp_wl.selection_available != 1) {
-        return;
-    }
-
-    int fds[2];
-    if (pipe(fds) < 0) {
-        _sapp_fail("wayland: pipe() failed to create communication channel for clipboard selection");
-    }
-    wl_data_offer_receive(_sapp_wl.data_offer, "text/plain", fds[1]);
-    close(fds[1]);
-
-    wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
-
-    size_t max_read = (size_t) _sapp.clipboard.buf_size - 1;
-    size_t bytes_read = 0;
-    size_t total_bytes_read = 0;
-    while (total_bytes_read < max_read) {
-        // read() gives a max 65536 bytes at a time, regardless of buf_size
-        bytes_read = read(fds[0], _sapp.clipboard.buffer + total_bytes_read, max_read - total_bytes_read);
-        if (bytes_read > 0)
-            total_bytes_read += bytes_read;
-        else
-            break;
-    }
-    _sapp.clipboard.buffer[total_bytes_read] = 0;
-
-    char buffer[128];
-    snprintf(buffer, 128, "Read %d bytes into clipboard buffer of size %d and %s", total_bytes_read, max_read,
-        bytes_read > 0 ? "ran out of clipboard space" : 
-        bytes_read == 0 ? "reached EOF" : "failed reading");
-    
-    if (bytes_read < 0) {
-        _sapp_fail(buffer);
-    } else {
-        _sapp_info(buffer); // Remove after below TODO
-    }
-    // TODO only accept & receive the offer when Ctrl+V is pressed
-    // otherwise every time the window gains focus it grabs a copy of the clipboard
-    // as shown by this log message
-
-    close(fds[0]);
-
-    wl_data_offer_finish(_sapp_wl.data_offer);
-    wl_data_offer_destroy(_sapp_wl.data_offer);
-    _sapp_wl.data_offer = NULL;
-    _sapp_wl.selection_available = 0;
 }
 
 _SOKOL_PRIVATE const struct wl_data_device_listener _sapp_wl_data_device_listener = {
