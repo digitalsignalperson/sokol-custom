@@ -1197,7 +1197,7 @@ _SOKOL_PRIVATE void _sapp_wl_seat_handle_capabilities(void* data, struct wl_seat
 
             /* TODO: support for rtl default arrow? */
             _sapp_wl_create_cursor(SAPP_MOUSECURSOR_DEFAULT, cursor_theme, "left_ptr");
-            _sapp_wl_create_cursor(SAPP_MOUSECURSOR_ARROW, cursor_theme, "right_ptr");
+            _sapp_wl_create_cursor(SAPP_MOUSECURSOR_ARROW, cursor_theme, "left_ptr"); // TODO handle case system uses right_ptr?
             _sapp_wl_create_cursor(SAPP_MOUSECURSOR_IBEAM, cursor_theme, "xterm");
             _sapp_wl_create_cursor(SAPP_MOUSECURSOR_CROSSHAIR, cursor_theme, "crosshair");
             _sapp_wl_create_cursor(SAPP_MOUSECURSOR_POINTING_HAND, cursor_theme, "hand2");
@@ -1751,6 +1751,7 @@ _SOKOL_PRIVATE void _sapp_linux_run(const sapp_desc* desc) {
     pthread_attr_init(&pthread_attr);
     pthread_attr_destroy(&pthread_attr);
 
+    _SAPP_CLEAR_ARC_STRUCT(_sapp_wl_t, _sapp_wl);
     _sapp_init_state(desc);
 
     _sapp_wl_setup(&_sapp.desc);
