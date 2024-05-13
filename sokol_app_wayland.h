@@ -163,6 +163,7 @@ typedef struct {
     struct zwp_relative_pointer_v1 *relative_pointer;
     uint32_t serial;
 
+
     /* accumulated touch state */
     struct _sapp_wl_touchpoint touchpoints[SAPP_MAX_TOUCHPOINTS];
 
@@ -470,12 +471,24 @@ _SOKOL_PRIVATE void _sapp_wl_update_cursor(sapp_mouse_cursor cursor, bool shown)
     }
 
     if (shown) {
-        wl_surface_attach(_sapp_wl.cursor_surface, _sapp_wl.cursors[cursor].buffer, 0, 0);
+        struct wl_cursor *current_cursor = _sapp_wl.cursors[_sapp.mouse.current_cursor].cursor;
+        int32_t current_hotspot_x = 0;
+        int32_t current_hotspot_y = 0;
+        if (NULL != current_cursor) {
+            current_hotspot_x = current_cursor->images[0]->hotspot_x;
+            current_hotspot_y = current_cursor->images[0]->hotspot_y;
+        }
+        int32_t new_hotspot_x = selected_cursor->images[0]->hotspot_x;
+        int32_t new_hotspot_y = selected_cursor->images[0]->hotspot_y;
+        int32_t x = current_hotspot_x - new_hotspot_x;
+        int32_t y = current_hotspot_y - new_hotspot_y;
+
+        wl_surface_attach(_sapp_wl.cursor_surface, _sapp_wl.cursors[cursor].buffer, x, y);
         wl_surface_damage_buffer(_sapp_wl.cursor_surface, 0, 0, INT32_MAX, INT32_MAX);
         wl_surface_commit(_sapp_wl.cursor_surface);
 
         if (NULL != _sapp_wl.cursor_surface) {
-            wl_pointer_set_cursor(_sapp_wl.pointer, serial, _sapp_wl.cursor_surface, (int32_t) selected_cursor->images[0]->hotspot_x, (int32_t) selected_cursor->images[0]->hotspot_y);
+            wl_pointer_set_cursor(_sapp_wl.pointer, serial, _sapp_wl.cursor_surface, new_hotspot_x, new_hotspot_y);
         }
     } else {
         wl_pointer_set_cursor(_sapp_wl.pointer, serial, NULL, 0, 0);
