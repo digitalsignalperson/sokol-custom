@@ -173,6 +173,8 @@ typedef struct {
     /* dnd data */
     struct wl_data_offer *data_offer;
     int selection_available;
+    int selection_receive_fd;
+    int selection_from_us;
 
     /* surface reference for focus/unfocused event */
     struct wl_surface* focus;
@@ -580,41 +582,47 @@ _SOKOL_PRIVATE void _sapp_wl_accept_selection() {
     if (pipe(fds) < 0) {
         _sapp_fail("wayland: pipe() failed to create communication channel for clipboard selection");
     }
+    _sapp_wl.selection_receive_fd = fds[1];
+    _sapp_wl.selection_from_us = 0;
     wl_data_offer_receive(_sapp_wl.data_offer, "text/plain", fds[1]);
     close(fds[1]);
 
     wl_display_roundtrip_queue(_sapp_wl.display, _sapp_wl.event_queue);
-
-    size_t max_read = (size_t) _sapp.clipboard.buf_size - 1;
-    size_t bytes_read = 0;
-    size_t total_bytes_read = 0;
-    while (total_bytes_read < max_read) {
-        // read() gives a max 65536 bytes at a time, regardless of buf_size
-        bytes_read = read(fds[0], _sapp.clipboard.buffer + total_bytes_read, max_read - total_bytes_read);
-        if (bytes_read > 0)
-            total_bytes_read += bytes_read;
-        else
-            break;
-    }
-    _sapp.clipboard.buffer[total_bytes_read] = 0;
-
-    char buffer[128];
-    snprintf(buffer, 128, "Read %d bytes into clipboard buffer of size %d and %s", total_bytes_read, max_read,
-        bytes_read > 0 ? "ran out of clipboard space" : 
-        bytes_read == 0 ? "reached EOF" : "failed reading");
-    
-    if (bytes_read < 0) {
-        _sapp_fail(buffer);
+    if (_sapp_wl.selection_from_us == 1) {
+        _sapp_info("Trying to pipe our clipboard to ourself. No action required.");
     } else {
-        _sapp_info(buffer);
-    }
+        size_t max_read = (size_t) _sapp.clipboard.buf_size - 1;
+        size_t bytes_read = 0;
+        size_t total_bytes_read = 0;
+        while (total_bytes_read < max_read) {
+            // read() gives a max 65536 bytes at a time, regardless of buf_size
+            bytes_read = read(fds[0], _sapp.clipboard.buffer + total_bytes_read, max_read - total_bytes_read);
+            if (bytes_read > 0)
+                total_bytes_read += bytes_read;
+            else
+                break;
+        }
+        _sapp.clipboard.buffer[total_bytes_read] = 0;
 
+        char buffer[128];
+        snprintf(buffer, 128, "Read %d bytes into clipboard buffer of size %d and %s", total_bytes_read, max_read,
+            bytes_read > 0 ? "ran out of clipboard space" : 
+            bytes_read == 0 ? "reached EOF" : "failed reading");
+        
+        if (bytes_read < 0) {
+            _sapp_fail(buffer);
+        } else {
+            _sapp_info(buffer);
+        }
+    }
     close(fds[0]);
 
     wl_data_offer_finish(_sapp_wl.data_offer);
     wl_data_offer_destroy(_sapp_wl.data_offer);
     _sapp_wl.data_offer = NULL;
     _sapp_wl.selection_available = 0;
+    _sapp_wl.selection_receive_fd = 0;
+    _sapp_wl.selection_from_us = 0;
 }
 
 _SOKOL_PRIVATE void _sapp_wl_key_event(sapp_event_type type, sapp_keycode key, bool is_repeat, uint32_t modifiers) {
@@ -745,9 +753,15 @@ _SOKOL_PRIVATE void _sapp_wl_data_source_handle_send(void* data, struct wl_data_
     _SOKOL_UNUSED(data);
     _SOKOL_UNUSED(data_source);
 
-    if (0 == strcmp(mime_type, "text/plain")) {
-        if (write(fd, _sapp.clipboard.buffer, strlen(_sapp.clipboard.buffer)) < 0) {
+    if (fd == _sapp_wl.selection_receive_fd) {
+        _sapp_wl.selection_from_us = 1;
+    } else if (0 == strcmp(mime_type, "text/plain")) {
+        unsigned len = strlen(_sapp.clipboard.buffer);
+        unsigned result = write(fd, _sapp.clipboard.buffer, len);
+        if (result < 0) {
             _sapp_fail("clipboard send failed");
+        } else if (result < len) {
+            _sapp_fail("partial clipboard sent");
         }
     } else {
         _sapp_fail("clipboard mime type fail");
@@ -1521,6 +1535,7 @@ _SOKOL_PRIVATE void _sapp_wl_data_device_handle_selection(void* data, struct wl_
     _SOKOL_UNUSED(data_device);
     _SOKOL_UNUSED(offer);
 
+    _sapp_info("selection offer available");
     _sapp_wl.selection_available = 1;
 }
 
