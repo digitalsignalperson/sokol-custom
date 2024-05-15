@@ -1022,10 +1022,12 @@ _SOKOL_PRIVATE void _sapp_wl_pointer_button(void* data, struct wl_pointer* point
             btn = SAPP_MOUSEBUTTON_MIDDLE;
             break;
         default:
+            // TODO can we get BTN_BACK support
             break;
     }
 
-    _sapp_wl_mouse_event(type, btn, _sapp_wl_get_modifiers());
+    if (type != SAPP_EVENTTYPE_INVALID && btn != SAPP_MOUSEBUTTON_INVALID)
+        _sapp_wl_mouse_event(type, btn, _sapp_wl_get_modifiers());
 }
 
 _SOKOL_PRIVATE void _sapp_wl_pointer_enter(void* data, struct wl_pointer* pointer, uint32_t serial, struct wl_surface* surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
