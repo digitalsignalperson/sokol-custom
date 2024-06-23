@@ -467,11 +467,11 @@ _SOKOL_PRIVATE void _sapp_wl_cleanup(void) {
     if (NULL != _sapp_wl.xkb_state) xkb_state_unref(_sapp_wl.xkb_state);
     if (NULL != _sapp_wl.xkb_context) xkb_context_unref(_sapp_wl.xkb_context);
 
-    for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
-        struct wl_buffer* buffer = _sapp_wl.cursors[i].buffer;
-        if (NULL != buffer)
-            wl_buffer_destroy(buffer);
-    }
+    // for (int i = 0; i < _SAPP_MOUSECURSOR_NUM; i++) {
+    //     struct wl_buffer* buffer = _sapp_wl.cursors[i].buffer;
+    //     if (NULL != buffer)
+    //         wl_buffer_destroy(buffer);
+    // }
 
     if (NULL != _sapp_wl.data_offer) {
         wl_data_offer_destroy(_sapp_wl.data_offer);
