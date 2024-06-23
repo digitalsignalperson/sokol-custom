@@ -147,6 +147,10 @@ typedef struct {
     struct xkb_state* xkb_state;
     struct xkb_keymap* xkb_keymap;
 
+    /* we need to track modifiers from _sapp_wl_key_modifier_bit for _sapp_wl_get_modifiers */
+    uint32_t key_modifier_bit;
+    bool key_modifier_bit_release; // needed to clear the bit on release
+
     /* repeat information */
     sapp_keycode repeat_key_code;
     uint32_t repeat_key_char;
@@ -287,6 +291,7 @@ _SOKOL_PRIVATE sapp_keycode _sapp_wl_translate_key(xkb_keysym_t sym) {
         case XKB_KEY_Escape:       return SAPP_KEYCODE_ESCAPE;
         case XKB_KEY_Return:       return SAPP_KEYCODE_ENTER;
         case XKB_KEY_Tab:          return SAPP_KEYCODE_TAB;
+        case XKB_KEY_ISO_Left_Tab: return SAPP_KEYCODE_TAB; // this code appears when using Shift+Tab
         case XKB_KEY_BackSpace:    return SAPP_KEYCODE_BACKSPACE;
         case XKB_KEY_Insert:       return SAPP_KEYCODE_INSERT;
         case XKB_KEY_Delete:       return SAPP_KEYCODE_DELETE;
@@ -362,6 +367,26 @@ _SOKOL_PRIVATE sapp_keycode _sapp_wl_translate_key(xkb_keysym_t sym) {
     }
 }
 
+// copy of _sapp_x11_key_modifier_bit. TODO make common function avail
+_SOKOL_PRIVATE uint32_t _sapp_wl_key_modifier_bit(sapp_keycode key) {
+    switch (key) {
+        case SAPP_KEYCODE_LEFT_SHIFT:
+        case SAPP_KEYCODE_RIGHT_SHIFT:
+            return SAPP_MODIFIER_SHIFT;
+        case SAPP_KEYCODE_LEFT_CONTROL:
+        case SAPP_KEYCODE_RIGHT_CONTROL:
+            return SAPP_MODIFIER_CTRL;
+        case SAPP_KEYCODE_LEFT_ALT:
+        case SAPP_KEYCODE_RIGHT_ALT:
+            return SAPP_MODIFIER_ALT;
+        case SAPP_KEYCODE_LEFT_SUPER:
+        case SAPP_KEYCODE_RIGHT_SUPER:
+            return SAPP_MODIFIER_SUPER;
+        default:
+            return 0;
+    }
+}
+
 _SOKOL_PRIVATE uint32_t _sapp_wl_get_modifiers(void) {
     uint32_t modifiers = 0;
 
@@ -379,6 +404,11 @@ _SOKOL_PRIVATE uint32_t _sapp_wl_get_modifiers(void) {
     if (0 < xkb_state_mod_name_is_active(_sapp_wl.xkb_state, XKB_MOD_NAME_LOGO, active_mask)) {
         modifiers |= SAPP_MODIFIER_SUPER;
     }
+
+    if (_sapp_wl.key_modifier_bit_release)
+        modifiers &= ~_sapp_wl.key_modifier_bit; // compositor doesn't clear modifier bit on key up, so emulate that
+    else
+        modifiers |= _sapp_wl.key_modifier_bit; // compositor doesn't set modifier bit on key down, so emulate that
 
     return modifiers;
 }
@@ -836,7 +866,21 @@ _SOKOL_PRIVATE void _sapp_wl_keyboard_key(void* data, struct wl_keyboard* keyboa
     if (_sapp_events_enabled()) {
         xkb_keysym_t sym = xkb_state_key_get_one_sym(_sapp_wl.xkb_state, key + 8);
         sapp_keycode code = _sapp_wl_translate_key(sym);
+        // xkb only sets the modifier after another key is pressed
+        // E.g. 
+        // - press Ctrl: get code for ctrl, but no modifier
+        // - press Ctrl+Shift: get code for ctrl then shift, but only modifier for ctrl
+        // - press Ctrl+Shift+C: get codes for all the keys, and ctrl+shift modifires
+        //
+        // but applications (at least imgui) does not behave correctly if the modifiers have this delay effect
+        // see how sokol_app.h handles this for x11 with _sapp_x11_key_modifier_bit
+        _sapp_wl.key_modifier_bit = _sapp_wl_key_modifier_bit(code);
+        _sapp_wl.key_modifier_bit_release = key_state == WL_KEYBOARD_KEY_STATE_RELEASED;
         uint32_t modifiers = _sapp_wl_get_modifiers();
+
+        // char message[100];
+        // sprintf(message, "sym=%d code=%d, modifiers=%d", sym, code, modifiers);
+        // _sapp_info(message);
 
         if (WL_KEYBOARD_KEY_STATE_PRESSED == key_state) {
             _sapp_wl_key_event(SAPP_EVENTTYPE_KEY_DOWN, code, false, modifiers);
@@ -855,11 +899,7 @@ _SOKOL_PRIVATE void _sapp_wl_keyboard_key(void* data, struct wl_keyboard* keyboa
                 _sapp_wl.repeat_key_code = code;
             }
         } else if (WL_KEYBOARD_KEY_STATE_RELEASED == key_state) {
-            _sapp_wl_key_event(SAPP_EVENTTYPE_KEY_UP, code, false, 0);
-            // Don't send modifiers for key release or else this happens:
-            // e.g. Press Ctrl and release: 
-            //  - ImGui inputs will show there is a Key down for "ModCtrl" 662 with a CTRL modifier,
-            //  - this stays on until another input occurs.
+            _sapp_wl_key_event(SAPP_EVENTTYPE_KEY_UP, code, modifiers, 0);
 
             if (_sapp_wl.repeat_key_code == code) {
                 _sapp_wl.repeat_key_char = 0;
