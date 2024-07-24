@@ -214,6 +214,7 @@ _SOKOL_PRIVATE void _sapp_wl_timespec_add(struct timespec *a, struct timespec *b
 
 _SOKOL_PRIVATE sapp_keycode _sapp_wl_translate_key(xkb_keysym_t sym) {
     switch (sym) {
+        case XKB_KEY_space:        return SAPP_KEYCODE_SPACE;
         case XKB_KEY_KP_Space:     return SAPP_KEYCODE_SPACE;
         case XKB_KEY_apostrophe:   return SAPP_KEYCODE_APOSTROPHE;
         case XKB_KEY_comma:        return SAPP_KEYCODE_COMMA;
